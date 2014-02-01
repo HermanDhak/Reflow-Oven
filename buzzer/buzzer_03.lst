@@ -1,0 +1,669 @@
+0000              1   ;buzzer_02.asm: should do a countdown timer too
+0000              2   
+                 -1   $MODDE2
+0000              1   ;  MODDDE2: Register definition for DE2-8052 softcore
+0000              2   ;
+0000              3   ;   Copyright (C) 2011  Jesus Calvino-Fraga, jesusc at ece.ubc.ca
+0000              4   ;
+0000              5   ;   This library is free software; you can redistribute it and/or
+0000              6   ;   modify it under the terms of the GNU Lesser General Public
+0000              7   ;   License as published by the Free Software Foundation; either
+0000              8   ;   version 2.1 of the License, or (at your option) any later version.
+0000              9   ;
+0000             10   ;   This library is distributed in the hope that it will be useful,
+0000             11   ;   but WITHOUT ANY WARRANTY; without even the implied warranty of
+0000             12   ;   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+0000             13   ;   Lesser General Public License for more details.
+0000             14   ;
+0000             15   ;   You should have received a copy of the GNU Lesser General Public
+0000             16   ;   License along with this library; if not, write to the Free Software
+0000             17   ;   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+0000             18   ;
+0000             19       
+0000             20   P0     DATA  080H  ;PORT 0
+0000             21   SP     DATA  081H  ;STACK POINTER
+0000             22   DPL    DATA  082H  ;DATA POINTER - LOW BYTE
+0000             23   DPH    DATA  083H  ;DATA POINTER - HIGH BYTE
+0000             24   PCON   DATA  087H  ;POWER CONTROL
+0000             25   TCON   DATA  088H  ;TIMER CONTROL
+0000             26   TMOD   DATA  089H  ;TIMER MODE
+0000             27   TL0    DATA  08AH  ;TIMER 0 - LOW BYTE
+0000             28   TL1    DATA  08BH  ;TIMER 1 - LOW BYTE
+0000             29   TH0    DATA  08CH  ;TIMER 0 - HIGH BYTE
+0000             30   TH1    DATA  08DH  ;TIMER 1 - HIGH BYTE
+0000             31   P1     DATA  090H  ;PORT 1
+0000             32   SCON   DATA  098H  ;SERIAL PORT CONTROL
+0000             33   SBUF   DATA  099H  ;SERIAL PORT BUFFER
+0000             34   P2     DATA  0A0H  ;PORT 2
+0000             35   IE     DATA  0A8H  ;INTERRUPT ENABLE
+0000             36   P3     DATA  0B0H  ;PORT 3
+0000             37   IP     DATA  0B8H  ;INTERRUPT PRIORITY
+0000             38   T2CON  DATA  0C8H  ;TIMER 2 CONTROL
+0000             39   T2MOD  DATA  0C9H  ;TIMER 2 MODE
+0000             40   RCAP2L DATA  0CAH  ;TIMER 2 CAPTURE REGISTER - LOW BYTE
+0000             41   RCAP2H DATA  0CBH  ;TIMER 2 CAPTURE REGISTER - HIGH BYTE
+0000             42   TL2    DATA  0CCH  ;TIMER 2 - LOW BYTE
+0000             43   TH2    DATA  0CDH  ;TIMER 2 - HIGH BYTE
+0000             44   PSW    DATA  0D0H  ;PROGRAM STATUS WORD
+0000             45   ACC    DATA  0E0H  ;ACCUMULATOR
+0000             46   B      DATA  0F0H  ;MULTIPLICATION REGISTER
+0000             47   IT0    BIT   088H  ;TCON.0 - EXT. INTERRUPT 0 TYPE
+0000             48   IE0    BIT   089H  ;TCON.1 - EXT. INTERRUPT 0 EDGE FLAG
+0000             49   IT1    BIT   08AH  ;TCON.2 - EXT. INTERRUPT 1 TYPE
+0000             50   IE1    BIT   08BH  ;TCON.3 - EXT. INTERRUPT 1 EDGE FLAG
+0000             51   TR0    BIT   08CH  ;TCON.4 - TIMER 0 ON/OFF CONTROL
+0000             52   TF0    BIT   08DH  ;TCON.5 - TIMER 0 OVERFLOW FLAG
+0000             53   TR1    BIT   08EH  ;TCON.6 - TIMER 1 ON/OFF CONTROL
+0000             54   TF1    BIT   08FH  ;TCON.7 - TIMER 1 OVERFLOW FLAG
+0000             55   RI     BIT   098H  ;SCON.0 - RECEIVE INTERRUPT FLAG
+0000             56   TI     BIT   099H  ;SCON.1 - TRANSMIT INTERRUPT FLAG
+0000             57   RB8    BIT   09AH  ;SCON.2 - RECEIVE BIT 8
+0000             58   TB8    BIT   09BH  ;SCON.3 - TRANSMIT BIT 8
+0000             59   REN    BIT   09CH  ;SCON.4 - RECEIVE ENABLE
+0000             60   SM2    BIT   09DH  ;SCON.5 - SERIAL MODE CONTROL BIT 2
+0000             61   SM1    BIT   09EH  ;SCON.6 - SERIAL MODE CONTROL BIT 1
+0000             62   SM0    BIT   09FH  ;SCON.7 - SERIAL MODE CONTROL BIT 0
+0000             63   EX0    BIT   0A8H  ;IE.0 - EXTERNAL INTERRUPT 0 ENABLE
+0000             64   ET0    BIT   0A9H  ;IE.1 - TIMER 0 INTERRUPT ENABLE
+0000             65   EX1    BIT   0AAH  ;IE.2 - EXTERNAL INTERRUPT 1 ENABLE
+0000             66   ET1    BIT   0ABH  ;IE.3 - TIMER 1 INTERRUPT ENABLE
+0000             67   ES     BIT   0ACH  ;IE.4 - SERIAL PORT INTERRUPT ENABLE
+0000             68   ET2    BIT   0ADH  ;IE.5 - TIMER 2 INTERRUPT ENABLE
+0000             69   EA     BIT   0AFH  ;IE.7 - GLOBAL INTERRUPT ENABLE
+0000             70   RXD    BIT   0B0H  ;P3.0 - SERIAL PORT RECEIVE INPUT
+0000             71   TXD    BIT   0B1H  ;P3.1 - SERIAL PORT TRANSMIT OUTPUT
+0000             72   INT0   BIT   0B2H  ;P3.2 - EXTERNAL INTERRUPT 0 INPUT
+0000             73   INT1   BIT   0B3H  ;P3.3 - EXTERNAL INTERRUPT 1 INPUT
+0000             74   T0     BIT   0B4H  ;P3.4 - TIMER 0 COUNT INPUT
+0000             75   T1     BIT   0B5H  ;P3.5 - TIMER 1 COUNT INPUT
+0000             76   WR     BIT   0B6H  ;P3.6 - WRITE CONTROL FOR EXT. MEMORY
+0000             77   RD     BIT   0B7H  ;P3.7 - READ CONTROL FOR EXT. MEMORY
+0000             78   PX0    BIT   0B8H  ;IP.0 - EXTERNAL INTERRUPT 0 PRIORITY
+0000             79   PT0    BIT   0B9H  ;IP.1 - TIMER 0 PRIORITY
+0000             80   PX1    BIT   0BAH  ;IP.2 - EXTERNAL INTERRUPT 1 PRIORITY
+0000             81   PT1    BIT   0BBH  ;IP.3 - TIMER 1 PRIORITY
+0000             82   PS     BIT   0BCH  ;IP.4 - SERIAL PORT PRIORITY
+0000             83   PT2    BIT   0BDH  ;IP.5 - TIMER 2 PRIORITY
+0000             84   CAP2   BIT   0C8H  ;T2CON.0 - CAPTURE OR RELOAD SELECT
+0000             85   CNT2   BIT   0C9H  ;T2CON.1 - TIMER OR COUNTER SELECT
+0000             86   TR2    BIT   0CAH  ;T2CON.2 - TIMER 2 ON/OFF CONTROL
+0000             87   EXEN2  BIT   0CBH  ;T2CON.3 - TIMER 2 EXTERNAL ENABLE FLAG
+0000             88   TCLK   BIT   0CCH  ;T2CON.4 - TRANSMIT CLOCK SELECT
+0000             89   RCLK   BIT   0CDH  ;T2CON.5 - RECEIVE CLOCK SELECTT
+0000             90   EXF2   BIT   0CEH  ;T2CON.6 - EXTERNAL TRANSITION FLAG
+0000             91   TF2    BIT   0CFH  ;T2CON.7 - TIMER 2 OVERFLOW FLAG
+0000             92   P      BIT   0D0H  ;PSW.0 - ACCUMULATOR PARITY FLAG
+0000             93   OV     BIT   0D2H  ;PSW.2 - OVERFLOW FLAG
+0000             94   RS0    BIT   0D3H  ;PSW.3 - REGISTER BANK SELECT 0
+0000             95   RS1    BIT   0D4H  ;PSW.4 - REGISTER BANK SELECT 1
+0000             96   F0     BIT   0D5H  ;PSW.5 - FLAG 0
+0000             97   AC     BIT   0D6H  ;PSW.6 - AUXILIARY CARRY FLAG
+0000             98   CY     BIT   0D7H  ;PSW.7 - CARRY FLAG
+0000             99   
+0000            100   ; For the altera DE2 configured with an 8051/8052 softcore processor
+0000            101   ; we have the following extra registers:
+0000            102   
+0000            103   HEX0   DATA  091H ; Zero turns the segment on
+0000            104   HEX1   DATA  092H ; 
+0000            105   HEX2   DATA  093H ; 
+0000            106   HEX3   DATA  094H ; 
+0000            107   HEX4   DATA  08EH ;
+0000            108   HEX5   DATA  08FH ;
+0000            109   HEX6   DATA  096H ;
+0000            110   HEX7   DATA  097H ;
+0000            111   
+0000            112   P0MOD  DATA  09AH ; Input/output mode bits for port 0.  '1' sets the port to output mode.
+0000            113   P1MOD  DATA  09BH ; Input/output mode bits for port 1
+0000            114   P2MOD  DATA  09CH ; Input/output mode bits for port 2
+0000            115   P3MOD  DATA  09DH ; Input/output mode bits for port 3
+0000            116   
+0000            117   LEDRA  DATA  0E8H ; LEDs LEDR0 to LEDR7 (bit addressable, ex: LEDRA.1 for LEDR1)
+0000            118   LEDRB  DATA  095H ; LEDs LEDR8 to LEDR15
+0000            119   LEDRC  DATA  09EH ; LEDs LEDR16, LEDR15, and LEDG8
+0000            120   LEDG   DATA  0F8H ; LEDs LEDG0 to LEDG7 (bit addressable, ex: LEDG.3 for LEDG3)
+0000            121   SWA    DATA  0E8H ; Switches SW0 to SW7 (bit addressable, ex: SWA.1 for SW1)
+0000            122   SWB    DATA  095H ; Switches SW8 to SW15
+0000            123   SWC    DATA  09EH ; Switches SW16 and SW17
+0000            124   KEY    DATA  0F8H ; KEY1=KEY.1, KEY2=KEY.2, KEY3=KEY.3.  KEY0 is the reset button! 
+0000            125   
+0000            126   LCD_CMD   DATA 0D8H ;
+0000            127   LCD_DATA  DATA 0D9H ;
+0000            128   LCD_MOD   DATA 0DAH ; Write 0xff to make LCD_DATA an output
+0000            129   LCD_RW    BIT  0D8H ; '0' writes to LCD
+0000            130   LCD_EN    BIT  0D9H ; Toggle from '1' to '0'
+0000            131   LCD_RS    BIT  0DAH ; '0' for commands, '1' for data
+0000            132   LCD_ON    BIT  0DBH ; Write '1' to power the LCD
+0000            133   LCD_BLON  BIT  0DCH ; Write '1' to turn on back light
+0000            134   
+0000            135   FLASH_CMD  data 0DBH ; The control bits of the flash memory:
+0000            136   ; bit 0: FL_RST_N  Set to 1 for normal operation
+0000            137   ; bit 1: FL_WE_N
+0000            138   ; bit 2: FL_OE_N
+0000            139   ; bit 3: FL_CE_N
+0000            140   FLASH_DATA data 0DCH ; 8-bit data bus of flash memory.
+0000            141   FLASH_MOD  data 0DDH ; 0xff makes FLASH_DATA output.  0x00 makes FLASH_DATA input.
+0000            142   FLASH_ADD0 data 0E1H ; address bits 0 to 7.
+0000            143   FLASH_ADD1 data 0E2H ; address bits 8 to 15.
+0000            144   FLASH_ADD2 data 0E3H ; address bits 16 to 21.
+0000            145   
+0000              4   
+0000              5   org 0000H
+0000 02015B       6            ljmp myprogram
+0003              7            
+000B              8   org 000BH
+000B 020029       9            ljmp ISR_timer0
+000E             10            
+001B             11   org 001BH
+001B 02012C      12            ljmp ISR_timer1
+001E             13            
+0030             14   DSEG at 30H
+0030             15   count10ms: ds 1
+0031             16   countdown10ms: ds 1
+0032             17   sec:   ds 1
+0033             18   min:   ds 1
+0034             19   hrs:     ds 1
+0035             20   meridiem:  ds 1 ;keeps track of am/pm
+0036             21   secAlarm: ds 1
+0037             22   minAlarm: ds 1
+0038             23   hrsAlarm: ds 1
+0039             24   meridiemAlarm: ds 1
+003A             25   
+0000             26   BSEG
+0000             27   still12: dbit 1
+0001             28   still12Alarm: dbit 1
+0002             29   
+001E             30   CSEG
+001E             31   
+001E             32   ; Look-up table for 7-segment displays
+001E             33   myLUT:
+001E C0F9A4B0    34       DB 0C0H, 0F9H, 0A4H, 0B0H, 099H
+     99
+0023 9282F880    35       DB 092H, 082H, 0F8H, 080H, 090H
+     90
+0028 FF          36       DB 0FFH ; All segments off
+0029             37   
+0029             38   XTAL           EQU 33333333
+0029             39   FREQ_0         EQU 100
+0029             40   TIMER0_RELOAD  EQU 65536-(XTAL/(12*FREQ_0)) ;clock
+0029             41   FREQ_1              EQU 2000 ;lets face it 2000hz is irritating as hell, 1000hz is way less awful
+0029             42   TIMER1_RELOAD  EQU 65536-(XTAL/(12*2*FREQ_1)) ;buzz
+0029             43   
+0029             44   ;-----------------------------
+0029             45   ;-----------------------------
+0029             46   ;-----------------------------
+0029             47   ;-----------------------------
+0029             48   
+0029             49   ISR_Timer0:
+0029             50            ; Reload the timer
+0029 758C93      51       mov TH0, #high(TIMER0_RELOAD)
+002C 758A7F      52       mov TL0, #low(TIMER0_RELOAD)
+002F             53       
+002F             54       ; Save used register into the stack
+002F C0D0        55       push psw
+0031 C0F0        56       push b
+0033 C0E0        57       push acc
+0035 C083        58       push dph
+0037 C082        59       push dpl
+0039             60       
+0039             61   ISR_0:
+0039 20E837      62       jb SWA.0, ISR_Timer0_L0 ; Setting up time.  Do not increment anything
+003C             63       
+003C             64       ; Increment the counter and check if a second has passed
+003C             65       
+003C 0530        66            inc count10ms
+003E E530        67       mov a, count10ms
+0040 B46430      68       cjne A, #100, ISR_Timer0_L0
+0043 753000      69       mov count10ms, #0
+0046             70       
+0046 E532        71       mov a, sec
+0048 2401        72       add a, #1
+004A D4          73       da a
+004B F532        74       mov sec, a
+004D B46023      75       cjne A, #60H, ISR_Timer0_L0
+0050 753200      76       mov sec, #0
+0053             77    
+0053 E533        78       mov a, min
+0055 2401        79       add a, #1
+0057 D4          80       da a
+0058 F533        81       mov min, a
+005A B46016      82       cjne A, #60H, ISR_Timer0_L0
+005D 753300      83       mov min, #0
+0060             84   
+0060 E534        85       mov a, hrs
+0062 2401        86       add a, #1
+0064 D4          87       da a
+0065 F534        88       mov hrs, a
+0067             89       
+0067 120312      90       lcall checkMeridiem
+006A             91       
+006A B41306      92       cjne A, #13H, ISR_Timer0_L0
+006D 753401      93       mov hrs, #1
+0070             94       
+0070 20E938      95       jb SWA.1, ISR_Timer_Countdown ;setting up alarm, do not display time
+0073             96      
+0073             97   ISR_Timer0_L0:
+0073             98   
+0073             99            ; Update the display.  This happens every 10 ms
+0073 90001E     100            mov dptr, #myLUT
+0076            101     
+0076 853591     102            mov HEX0, meridiem
+0079            103            
+0079 E532       104            mov a, sec
+007B 540F       105            anl a, #0fH
+007D 93         106            movc a, @a+dptr
+007E F593       107            mov HEX2, a
+0080 E532       108            mov a, sec
+0082 C4         109            swap a
+0083 540F       110            anl a, #0fH
+0085 93         111            movc a, @a+dptr
+0086 F594       112            mov HEX3, a
+0088            113   
+0088 E533       114            mov a, min
+008A 540F       115            anl a, #0fH
+008C 93         116            movc a, @a+dptr
+008D F58E       117            mov HEX4, a
+008F E533       118            mov a, min
+0091 C4         119            swap a
+0092 540F       120            anl a, #0fH
+0094 93         121            movc a, @a+dptr
+0095 F58F       122            mov HEX5, a
+0097            123   
+0097 E534       124            mov a, hrs
+0099 540F       125            anl a, #0fH
+009B 93         126            movc a, @a+dptr
+009C F596       127            mov HEX6, a
+009E E534       128            mov a, hrs
+00A0 20E402     129            jb acc.4, ISR_Timer0_L1
+00A3 74A0       130            mov a, #0A0H
+00A5            131            
+00A5            132   ISR_Timer0_L1:
+00A5 C4         133            swap a
+00A6 540F       134            anl a, #0fH
+00A8 93         135            movc a, @a+dptr
+00A9 F597       136            mov HEX7, a
+00AB            137            
+00AB            138   ISR_Timer_Countdown:
+00AB E59E       139            mov a, SWC
+00AD 5401       140            anl a, #00000001B
+00AF 6070       141            jz  ISR_End ;if we haven't pressed start yet, don't countdown
+00B1            142   
+00B1 1531       143            dec countdown10ms
+00B3 E531       144       mov a, countdown10ms
+00B5 B46469     145       cjne A, #100, ISR_End
+00B8 753100     146       mov countdown10ms, #0
+00BB            147   ;--------- SECONDS
+00BB E536       148       mov a, secAlarm ;seconds decrementing
+00BD 540F       149       anl a, #0FH
+00BF B4000A     150       cjne A, #0, regularSec
+00C2 E536       151       mov a, secAlarm
+00C4 C4         152       swap a
+00C5 9401       153       subb a, #1
+00C7 4490       154       orl a, #10010000B
+00C9 C4         155       swap a
+00CA 8004       156       sjmp shiftBackSec
+00CC            157   regularSec:
+00CC E536       158            mov a, secAlarm
+00CE 9401       159            subb a, #1  
+00D0            160   shiftBackSec:
+00D0 F536       161       mov secAlarm, a
+00D2 B4FF4C     162       cjne A, #0FFH, ISR_End ;check to see if "-1" -> then we've overflowed, go back to 59
+00D5 753659     163       mov secAlarm, #59H
+00D8            164       
+00D8            165   ;-------- MINUTES   ***********************************************************
+00D8 E537       166            mov a, minAlarm ;seconds decrementing
+00DA 540F       167       anl a, #0FH
+00DC B40016     168       cjne A, #0, regularMin ;if lsb minutes = 0, check if it can borrow from msb
+00DF E537       169            mov a, minAlarm
+00E1 B40007     170            cjne A, #0, decrementMinOK ; if msb ALSO  = 0, check if it can borrow from hrs
+00E4 E538       171       mov A, hrsAlarm
+00E6 B40010     172       cjne A, #0, shiftBackMin ;if hrs ALSO = 0, leave it
+00E9 8036       173       sjmp ISR_End ;for the case where min = 00, hrs = 00, we can't do any more decrements for either
+00EB            174   DecrementMinOK: 
+00EB E537       175       mov a, minAlarm
+00ED C4         176       swap a
+00EE 9401       177       subb a, #1
+00F0 4490       178       orl a, #10010000B
+00F2 C4         179       swap a
+00F3 8004       180       sjmp shiftBackMin
+00F5            181   regularMin:
+00F5 E537       182            mov a, minAlarm
+00F7 9401       183            subb a, #1  
+00F9            184   shiftBackMin:
+00F9 F537       185       mov minAlarm, a
+00FB B40023     186       cjne A, #00H, ISR_End
+00FE 75373B     187       mov minAlarm, #59
+0101            188       
+0101            189   ;--------- HOURS
+0101 E538       190            mov a, hrsAlarm ;hrs decrementing
+0103 540F       191       anl a, #0FH
+0105 B4000A     192       cjne A, #0, regularHrs
+0108 E538       193       mov a, hrsAlarm
+010A C4         194       swap a
+010B 9401       195       subb a, #1
+010D 4490       196       orl a, #10010000B
+010F C4         197       swap a
+0110 8004       198       sjmp shiftBackHrs
+0112            199   regularHrs:
+0112 E538       200            mov a, hrsAlarm
+0114 9401       201            subb a, #1  
+0116            202   shiftBackHrs:
+0116 F538       203       mov hrsAlarm, a
+0118 B4FF06     204       cjne A, #0FFH, ISR_End ;safety
+011B 753800     205       mov hrsAlarm, #00
+011E            206    
+011E            207   noDecrement:
+011E 1202D9     208       lcall DisplayAlarm
+0121            209            
+0121            210   
+0121            211   ISR_End:
+0121            212            ; Restore used registers
+0121 D082       213            pop dpl
+0123 D083       214            pop dph
+0125 D0E0       215            pop acc
+0127 D0F0       216            pop b
+0129 D0D0       217            pop psw    
+012B 32         218            reti
+012C            219   
+012C            220   ;--------------------------------------   
+012C            221   ;--------------------------------------   
+012C            222   ;--------------------------------------      
+012C            223   ;--------------------------------------      
+012C            224      
+012C            225   ISR_Timer1:
+012C C28F       226            clr TF1 ;may not be necessary
+012E B2A0       227            cpl P2.0
+0130 B2A1       228            cpl P2.1
+0132 758DFD     229       mov TH1, #high(TIMER1_RELOAD)
+0135 758B4A     230       mov TL1, #low(TIMER1_RELOAD)
+0138 32         231            reti
+0139            232            
+0139            233   ;--------------------------------------   
+0139            234   ;--------------------------------------   
+0139            235   ;--------------------------------------      
+0139            236   ;--------------------------------------  
+0139            237   
+0139            238   Init_Timer0:     
+0139 758911     239            mov TMOD,  #00010001B ; GATE=0, C/T*=0, M1=0, M0=1: 16-bit timer
+013C C28C       240            clr TR0 ; Disable timer 0
+013E C28D       241            clr TF0
+0140 758C93     242       mov TH0, #high(TIMER0_RELOAD)
+0143 758A7F     243       mov TL0, #low(TIMER0_RELOAD)
+0146 D28C       244       setb TR0 ; Enable timer 0
+0148 D2A9       245       setb ET0 ; Enable timer 0 interrupt
+014A 22         246       ret
+014B            247       
+014B            248   Init_Timer1:     
+014B 758911     249            mov TMOD,  #00010001B ; GATE=0, C/T*=0, M1=0, M0=1: 16-bit timer
+014E C28E       250            clr TR1 ; Disable timer 1
+0150 C28F       251            clr TF1
+0152 758DFD     252       mov TH1, #high(TIMER1_RELOAD)
+0155 758B4A     253       mov TL1, #low(TIMER1_RELOAD)
+0158 D28E       254       setb TR1 ; Enable timer 1, dont set interrupt yet
+015A 22         255       ret
+015B            256   
+015B            257   
+015B            258   ;-------------------------------------------------------------------------------------------
+015B            259   ;-------------------------------------------------------------------------------------------
+015B            260   ;-------------------------------------------------------------------------------------------
+015B            261   ;-------------------------------------------------------------------------------------------
+015B            262   ;-------------------------------------------------------------------------------------------
+015B            263   
+015B            264   myprogram:
+015B 75817F     265            mov SP, #7FH
+015E 75E800     266            mov LEDRA,#0
+0161 759500     267            mov LEDRB,#0
+0164 759E00     268            mov LEDRC,#0
+0167 75F800     269            mov LEDG,#0
+016A 759C03     270            mov P2MOD, #00000011B ; P2.0, P2.1 are outputs.
+016D D2A0       271            setb P2.0
+016F D2A1       272            setb p2.1
+0171            273   
+0171 753250     274            mov sec, #50H
+0174 753359     275            mov min, #59H
+0177 753411     276            mov hrs, #11H
+017A 753508     277            mov meridiem, #08H
+017D C200       278            clr still12
+017F            279            
+017F 753615     280            mov secAlarm, #15H
+0182 753700     281            mov minAlarm, #00H
+0185 753801     282            mov hrsAlarm, #01H
+0188 75390C     283            mov meridiemAlarm, #0CH
+018B C201       284            clr still12Alarm
+018D            285   
+018D 120139     286            lcall Init_Timer0 ;set up
+0190 12014B     287            lcall Init_Timer1
+0193            288            
+0193 D2AF       289       setb EA  ; Enable all interrupts
+0195            290   
+0195            291   M0: ;clock set loop
+0195            292            
+0195 30EB05     293            jnb SWA.3, M0_Test
+0198 12022D     294            lcall Alarm
+019B C2E9       295            clr LEDRA.1
+019D            296   M0_Test:
+019D 20E942     297            jb SWA.1, A0 ;alarm set mode
+01A0 30E8F2     298            jnb SWA.0, M0 ;clock set mode
+01A3            299            
+01A3 20FB13     300            jb KEY.3, M1
+01A6 30FBFD     301       jnb KEY.3, $
+01A9 E534       302       mov a, hrs
+01AB 2401       303            add a, #1
+01AD D4         304            da a
+01AE F534       305            mov hrs, a
+01B0 120312     306            lcall checkMeridiem
+01B3 B41303     307       cjne A, #13H, M1
+01B6 753401     308       mov hrs, #1
+01B9            309   M1:      
+01B9 20FA10     310            jb KEY.2, M2
+01BC 30FAFD     311       jnb KEY.2, $
+01BF E533       312       mov a, min
+01C1 2401       313            add a, #1
+01C3 D4         314            da a
+01C4 F533       315            mov min, a      
+01C6 B46003     316       cjne A, #60H, M2
+01C9 753300     317       mov min, #0
+01CC            318   M2:      
+01CC 20F910     319            jb KEY.1, M3
+01CF 30F9FD     320            jnb KEY.1, $
+01D2 E532       321            mov a, sec
+01D4 2401       322            add a, #1
+01D6 D4         323            da a
+01D7 F532       324            mov sec, a
+01D9 B46003     325       cjne A, #60H, M3
+01DC 753200     326       mov sec, #0
+01DF            327   M3:      
+01DF 020195     328            ljmp M0
+01E2            329            
+01E2            330   A0: ;alarm set loop
+01E2 30E9B0     331            jnb SWA.1, M0 
+01E5 1202D9     332            lcall DisplayAlarm
+01E8            333            
+01E8 20FB13     334            jb KEY.3, A1
+01EB            335   hrdisp:  
+01EB 1202D9     336            lcall DisplayAlarm
+01EE 30FBFA     337       jnb KEY.3, hrdisp
+01F1 E538       338       mov a, hrsAlarm
+01F3 2401       339            add a, #1
+01F5 D4         340            da a
+01F6 F538       341            mov hrsAlarm, a
+01F8 B41303     342       cjne A, #13H, A1
+01FB 753801     343       mov hrsAlarm, #1
+01FE            344   A1:      
+01FE 20FA13     345            jb KEY.2, A2
+0201            346   mindisp:
+0201 1202D9     347            lcall DisplayAlarm
+0204 30FAFA     348       jnb KEY.2, mindisp
+0207 E537       349       mov a, minAlarm
+0209 2401       350            add a, #1
+020B D4         351            da a
+020C F537       352            mov minAlarm, a         
+020E B46003     353       cjne A, #60H, A2
+0211 753700     354       mov minAlarm, #0
+0214            355   A2:      
+0214 20F913     356            jb KEY.1, A3
+0217            357   secdisp:
+0217 1202D9     358            lcall DisplayAlarm
+021A 30F9FA     359            jnb KEY.1, secdisp
+021D E536       360            mov a, secAlarm
+021F 2401       361            add a, #1
+0221 D4         362            da a
+0222 F536       363            mov secAlarm, a
+0224 B46003     364       cjne A, #60H, A3
+0227 753600     365       mov secAlarm, #0
+022A            366   A3:      
+022A 0201E2     367            ljmp A0
+022D            368   
+022D            369   ;-------------------------------------------------------------------------------------------
+022D            370   ;-------------------------------------------------------------------------------------------
+022D            371   ;-------------------------------------------------------------------------------------------
+022D            372   ;-------------------------------------------------------------------------------------------
+022D            373   ; here's all the subroutines called in the main program
+022D            374   
+022D            375   Alarm:
+022D D2E9       376            setb LEDRA.1
+022F 20EF0D     377            jb SWA.7, startStateBeeps
+0232 20EE14     378            jb SWA.6, nextStateBeeps
+0235 20ED19     379            jb SWA.5, openDoorBeeps
+0238 20EC1E     380            jb SWA.4, coolEnoughBeeps
+023B 20EBEF     381            jb SWA.3, Alarm
+023E 22         382            ret
+023F            383            
+023F            384   startStateBeeps:
+023F 20EFFD     385            jb SWA.7, startStateBeeps
+0242 D2EA       386            setb LEDRA.2
+0244 1202A4     387            lcall shortBeep
+0247 80E4       388            sjmp Alarm
+0249            389            
+0249            390   nextStateBeeps:
+0249 20EEFD     391            jb SWA.6, nextStateBeeps
+024C 1202A4     392            lcall shortBeep
+024F 80DC       393            sjmp Alarm
+0251            394            
+0251            395   openDoorBeeps:
+0251 20EDFD     396            jb SWA.5, openDoorBeeps
+0254 120270     397            lcall longBeep
+0257 80D4       398            sjmp Alarm
+0259            399            
+0259            400   coolEnoughBeeps:
+0259 20ECFD     401            jb SWA.4, coolEnoughBeeps
+025C 1202A4     402            lcall shortBeep         
+025F 1202A4     403            lcall shortBeep
+0262 1202A4     404            lcall shortBeep
+0265 1202A4     405            lcall shortBeep
+0268 1202A4     406            lcall shortBeep
+026B 1202A4     407            lcall shortBeep
+026E 80BD       408            sjmp Alarm
+0270            409   
+0270            410            
+0270            411   longBeep:
+0270 75E8FF     412            mov LEDRA, #11111111B
+0273 7595FF     413            mov LEDRB, #11111111B 
+0276 759E03     414            mov LEDRC, #00000011B
+0279 1202C6     415       lcall buzzOn
+027C 1202CC     416            lcall WaitALittle
+027F 1202CC     417            lcall WaitALittle
+0282 1202CC     418            lcall WaitALittle
+0285 1202CC     419            lcall WaitALittle
+0288 1202CC     420            lcall WaitALittle
+028B 1202CC     421            lcall WaitALittle
+028E 1202CC     422            lcall WaitALittle
+0291 1202CC     423            lcall WaitALittle
+0294 75E800     424            mov LEDRA, #00000000B
+0297 759500     425            mov LEDRB, #00000000B 
+029A 759E00     426            mov LEDRC, #00000000B
+029D 1202C9     427       lcall buzzOff
+02A0 1202CC     428       lcall WaitALittle
+02A3 22         429       ret
+02A4            430            
+02A4            431   shortBeep:
+02A4 75E8FF     432            mov LEDRA, #11111111B
+02A7 7595FF     433            mov LEDRB, #11111111B
+02AA 759E03     434            mov LEDRC, #00000011B
+02AD 1202C6     435       lcall buzzOn
+02B0 1202CC     436            lcall WaitALittle
+02B3 1202CC     437            lcall WaitALittle
+02B6 75E800     438            mov LEDRA, #00000000B
+02B9 759500     439            mov LEDRB, #00000000B 
+02BC 759E00     440            mov LEDRC, #00000000B
+02BF 1202C9     441       lcall buzzOff
+02C2 1202CC     442       lcall WaitALittle
+02C5 22         443       ret
+02C6            444       
+02C6            445   buzzOn:
+02C6 D2AB       446            setb ET1
+02C8 22         447            ret
+02C9            448            
+02C9            449   buzzOff:
+02C9 C2AB       450            clr ET1
+02CB 22         451            ret
+02CC            452            
+02CC            453   ;For a 33.33MHz clock, one cycle takes 30ns
+02CC            454   WaitALittle:
+02CC 7A14       455            mov R2, #20
+02CE 79FA       456   L3: mov R1, #250
+02D0 78FA       457   L2: mov R0, #250
+02D2 D8FE       458   L1: djnz R0, L1
+02D4 D9FA       459            djnz R1, L2
+02D6 DAF6       460            djnz R2, L3
+02D8 22         461            ret
+02D9            462            
+02D9            463   ;---------------------------for when we display the alarm        
+02D9            464   DisplayAlarm:
+02D9            465            ; Update the display
+02D9 90001E     466            mov dptr, #myLUT
+02DC            467            
+02DC 7591FF     468            mov HEX0, #0FFH ;clear am/pm display    
+02DF            469   
+02DF E536       470            mov a, secAlarm
+02E1 540F       471            anl a, #0fH
+02E3 93         472            movc a, @a+dptr
+02E4 F593       473            mov HEX2, a
+02E6 E536       474            mov a, secAlarm
+02E8 C4         475            swap a
+02E9 540F       476            anl a, #0fH
+02EB 93         477            movc a, @a+dptr
+02EC F594       478            mov HEX3, a
+02EE            479   
+02EE E537       480            mov a, minAlarm
+02F0 540F       481            anl a, #0fH
+02F2 93         482            movc a, @a+dptr
+02F3 F58E       483            mov HEX4, a
+02F5 E537       484            mov a, minAlarm
+02F7 C4         485            swap a
+02F8 540F       486            anl a, #0fH
+02FA 93         487            movc a, @a+dptr
+02FB F58F       488            mov HEX5, a
+02FD            489   
+02FD E538       490            mov a, hrsAlarm
+02FF 540F       491            anl a, #0fH
+0301 93         492            movc a, @a+dptr
+0302 F596       493            mov HEX6, a
+0304 E538       494            mov a, hrsAlarm
+0306 20E402     495            jb acc.4, exitDispAlarm
+0309 74A0       496            mov a, #0A0H    
+030B            497   exitDispAlarm:
+030B C4         498            swap a
+030C 540F       499            anl a, #0fH
+030E 93         500            movc a, @a+dptr
+030F F597       501            mov HEX7, a
+0311 22         502            ret
+0312            503            
+0312            504   ;-------this checks and changes am/pm
+0312            505   checkMeridiem:
+0312 E534       506            mov a, hrs
+0314 B4120C     507       cjne A, #12H, not12 ;if it isn't 12, leave
+0317            508       
+0317 20000B     509       jb still12, out ;if it is 12 but was previously 12, do nothing
+031A            510         
+031A            511   changeMeridiem: ;if it is 12 but was not previously 12 - now change meridiem
+031A E535       512            mov a, meridiem
+031C B2E2       513            cpl acc.2 ; changes 08H to 0CH and vice versa
+031E F535       514            mov meridiem, a         
+0320            515            ;display am/pm
+0320 853591     516            mov HEX0, meridiem
+0323            517   not12:
+0323 C200       518            clr still12
+0325            519   out:
+0325 22         520            ret
+0326            521            
+0326            522   END
