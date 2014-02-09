@@ -1,6 +1,30 @@
 $NOLIST
 
 CSEG
+
+Load_x_32 MAC
+	mov x+0, #low (%0 % 0x10000) 
+	mov x+1, #high(%0 % 0x10000) 
+	mov x+2, #low (%0 / 0x10000) 
+	mov x+3, #high(%0 / 0x10000) 
+ENDMAC
+
+Load_y_32 MAC
+	mov y+0, #low (%0 % 0x10000) 
+	mov y+1, #high(%0 % 0x10000) 
+	mov y+2, #low (%0 / 0x10000) 
+	mov y+3, #high(%0 / 0x10000) 
+ENDMAC
+
+Load_x MAC
+	mov x+0, #low (%0) 
+	mov x+1, #high(%0) 
+ENDMAC
+
+Load_y MAC
+	mov y+0, #low (%0) 
+	mov y+1, #high(%0) 
+ENDMAC
 	
 initialLCD_Message: ;first start up message
 	;Line 1
@@ -209,7 +233,57 @@ asciiConvert MAC
 	orl a, #30H
 	mov %3, a
 ENDMAC
+
+;Puts the variables entered by user back into the originial
+;soakTemp/Time and reflowTemp/Time variables
+reloadUserVariables:
+	BCDReverseDump(bcdSTemp+2,bcdSTemp+1,bcdSTemp+0)
+	lcall bcd2hex
+	mov soakTemp, x+0
+	BCDReverseDump(bcdSTime+2,bcdSTime+1,bcdSTime+0)
+	lcall bcd2hex
+	mov soakTime, x+0
+	BCDReverseDump(bcdRTemp+2,bcdRTemp+1,bcdRTemp+0)
+	lcall bcd2hex
+	mov reflowTemp, x+0
+	BCDReverseDump(bcdRTime+2,bcdRTime+1,bcdRTime+0)
+	lcall bcd2hex
+	mov reflowTime, x+0
+	ret
+
+;Converts the time stored in the user variables from seconds
+;to a combination of seconds and minutes so it can be loaded
+;into the timer easily	
+convertToMinutes:
+	clr mf
+	clr c
+	Load_y(60)
+	lcall x_gteq_y
+	jb mf, addToMinutes
+	sjmp secondsAreFine
+addToMinutes:
+	mov a, tempMin
+	inc a
+	mov tempMin, a
+	mov a, x+0
+	subb a, #60
+	mov x+0, a
+	sjmp convertToMinutes
+secondsAreFine:
+	;Convert seconds to bcd and store in tempSec
+	lcall hex2bcd
+	mov tempSec, bcd+0
 	
+	;Convert minutes to bcd and store in tempMin
+	mov x+1, #0
+	mov x+0, tempMin
+	lcall hex2bcd
+	mov tempMin, x+0
+	ret
+	
+;This SR checks if all user inputted variables are within the
+;allowable range of values. If not, they are rounded down to
+;the nearest acceptable value and displayed
 checkSTemp:
 	clr valChanged
 	BCDReverseDump(bcdSTemp+2,bcdSTemp+1,bcdSTemp+0)
