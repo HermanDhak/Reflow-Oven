@@ -6,6 +6,9 @@ org 0000H
 org 000BH
 	ljmp ISR_timer0
 
+org 001BH ;ISR for timer 1
+	ljmp ISR_timer1	
+	
 XTAL           EQU 33333333
 FREQ_0         EQU 100
 TIMER0_RELOAD  EQU 65536-(XTAL/(12*FREQ_0)) ;clock
@@ -32,21 +35,21 @@ tempSec: 		ds 1
 bcdSTemp:		ds 3 ;Temp values to write to LCD screen
 bcdSTime:		ds 3 ;Temp values to write to LCD screen
 bcdRTemp:		ds 3 ;Temp values to write to LCD screen
-bcdRtime:		ds 3 ;Temp values to write to LCD screen
+bcdRTime:		ds 3 ;Temp values to write to LCD screen
+bcdCTemp:		ds 3
+bcdJTemp:		ds 3
 currentTemp:  	ds 1
+junctionTemp:	ds 1
 soakTemp:  		ds 1
 reflowTemp:  	ds 1
 soakTime:  		ds 1
 reflowTime:  	ds 1
-junctionTemp:   ds 1
 op:     		ds 1
 count10ms: 		ds 1
-sec:   ds 1
-min:   ds 1
-hrs:     ds 1
-secAlarm: ds 1
-minAlarm: ds 1
-hrsAlarm: ds 1
+sec:   			ds 1
+min:   			ds 1
+secAlarm: 		ds 1
+minAlarm: 		ds 1
 
 	BSEG
 mf:      	dbit 1
@@ -57,6 +60,7 @@ preReflow: 	dbit 1
 reflow:  	dbit 1
 cooling: 	dbit 1
 valChanged: dbit 1
+secondPassed: dbit 1
 
 CSEG
 
@@ -64,6 +68,7 @@ $include(LCDStates.asm)
 $include(countdownAndClock.asm)
 $include(tempAndSPI.asm)
 $include(math32.asm)
+$include(buzzerSubroutines.asm)
 
 STemp_Str:
 	DB 'ST=', 0
@@ -79,8 +84,16 @@ Keep_Settings2_Str:
 	DB 'KEY3=Yes KEY2=No', 0
 Next_Line_Str:
 	DB 'Next: KEY.3     ', 0
-JuntionTemp_Str:
-	DB 'Tj=', 0
+Start_Line_Str:
+	DB 'Start: KEY.3    ', 0
+SelectProfile_Str:
+	DB 'Select Profile: ', 0
+Profiles_Str:
+	DB 'SW 0 1 2(Custom)', 0
+CurrentTemp_Str:
+	DB 'To=', 0	
+JunctionTemp_Str:
+	DB '  Tj=', 0
 soakTemp_Str:
 	DB 'SoakTemp:   ', 0
 soakTime_Str:
@@ -117,17 +130,20 @@ MyProgram:
 	mov LEDG,#0
 	
 	orl P0MOD, #00111000b ; make all CEs outputs
+	mov P2MOD, #00001111B ; P2.0...2.3 are outputs! Lots of buzzers!!!!!!
+	setb P2.0
+	setb P2.1
+	setb P2.2
+	setb P2.3
 	
 	mov sec, #00H
 	mov min, #00H
-	mov hrs, #00H
 
 	mov secAlarm, #00H
-	mov minAlarm, #00H
-	mov hrsAlarm, #00H ;set up    
+	mov minAlarm, #00H 
     
 	mov currentTemp, #0
-	mov soakTemp, #120 ;DEFAULTS
+	mov soakTemp, #120
 	mov soakTime, #90
 	mov reflowTemp, #210
 	mov reflowTime, #35
@@ -169,7 +185,7 @@ initializationState:
 
 getUserInput_L0:
 	jnb KEY.3, keepSettings
-	jnb KEY.2, rewriteSoakTemp
+	jnb KEY.2, selectProfile
 	clr a
 	mov bcd+0, a
 	mov bcd+1, a
@@ -188,7 +204,26 @@ keepSettings:
 	ljmp loadPreSoakState
 
 
+
 ;USER INPUT ===========================================
+selectProfile:
+	mov a, #80H
+	lcall LCD_command
+	mov dptr, #SelectProfile_Str
+	lcall writeString
+	
+	mov a, #0C0H
+	lcall LCD_command
+	mov dptr, #Profiles_Str
+	lcall writeString
+	jb SWA.2, debounceSWA2
+	;jb SWA.0, loadProfile0 ==============ADD These later
+	;jb SWA.1, loadProfile1
+	sjmp selectProfile
+
+debounceSWA2:
+  	jnb SWA.2, rewriteSoakTemp
+  	sjmp debounceSWA2
 rewriteSoakTemp:
 	mov a, #80H
 	lcall LCD_command
@@ -292,7 +327,7 @@ rewriteReflowTimeDebounce:
 rewriteReflowTime:
 	mov a, #80H
 	lcall LCD_command
-	mov dptr, #Next_Line_Str
+	mov dptr, #Start_Line_Str
 	lcall writeString
 	
 	mov a, #0C0H
@@ -357,75 +392,112 @@ displayCorrectedValues:
 ;BEGIN STATE MACHINE HERE:	
 
 loadPreSoakState:
-	setb preSoak
-	setb started
 	lcall LCD_init
-preSoakState:
-;Displays the current state, temp and elapsed time and keeps 
-;updating the current temperature variable 
-;================= READ TEMPS ==============
-	;comment this out when testing times
-	mov b, #0  ; Read channel 0
-	lcall Read_ADC_Channel
-	lcall calculateRoomTemp
-	lcall Display
-
-	lcall Opamp
-
-	lcall addingtemps
-;===============================================
 	
 	mov a, #80H
 	lcall LCD_command
 	mov dptr, #preSoakState_Str
 	lcall writeString
 	
+	lcall shortBeep
+	setb preSoak
+	setb started
+preSoakState:
+;Displays the current state, temp and elapsed time and keeps 
+;updating the current temperature variable 
+	mov b, #0  ; Read channel 0
+	lcall Read_ADC_Channel
+	lcall calculateRoomTemp
+	
+	mov junctionTemp, x+0
+	asciiConvert(junctionTemp, BCDJTemp+2,BCDJTemp+1,BCDJTemp+0)
+	
+	lcall Opamp
+	lcall addingtemps
+	
+	mov currentTemp, x+0
+	asciiConvert(currentTemp, BCDCTemp+2,BCDCTemp+1,BCDCTemp+0)
+	
 	mov LEDRA, #00000001B
 	
-	
+;Uncomment this later ********************************
+	;jnb preSoak, loadSoakState
 	mov a, SWB
 	jb acc.2, loadSoakState
 	ljmp preSoakState
 
 loadSoakState:
-	clr preSoak
 	lcall LCD_init
+	lcall shortBeep
+	mov a, #80H
+	lcall LCD_command
+	mov dptr, #SoakState_Str
+	lcall writeString
+	
 	BCDReverseDump(bcdSTime+2,bcdSTime+1,bcdSTime+0)
 	lcall bcd2hex
 	mov secAlarm, bcd+0
 	mov minAlarm, bcd+1
 	setb soak
 soakState:
-	mov a, #80H
-	lcall LCD_command
-	mov dptr, #SoakState_Str
-	lcall writeString
+	mov b, #0  ; Read channel 0
+	lcall Read_ADC_Channel
+	lcall calculateRoomTemp
 	
+	mov junctionTemp, x+0
+	asciiConvert(junctionTemp, BCDJTemp+2,BCDJTemp+1,BCDJTemp+0)
+	
+	lcall Opamp
+	lcall addingtemps
+	
+	mov currentTemp, x+0
+	asciiConvert(currentTemp, BCDCTemp+2,BCDCTemp+1,BCDCTemp+0)
+
 	mov LEDRA, #00000010B
 	
-	mov a, SWB
-	jb acc.3, loadPreReflowState
+	jnb soak, loadPreReflowState
 	ljmp soakState
 
 loadPreReflowState:
-	clr soak
 	lcall LCD_init
-	setb preReflow
-preReflowState:
+	lcall shortBeep
+	
 	mov a, #80H
 	lcall LCD_command
 	mov dptr, #preReflowState_Str
 	lcall writeString
 	
+	setb preReflow
+preReflowState:
+	mov b, #0  ; Read channel 0
+	lcall Read_ADC_Channel
+	lcall calculateRoomTemp
+	
+	mov junctionTemp, x+0
+	asciiConvert(junctionTemp, BCDJTemp+2,BCDJTemp+1,BCDJTemp+0)
+	
+	lcall Opamp
+	lcall addingtemps
+	
+	mov currentTemp, x+0
+	asciiConvert(currentTemp, BCDCTemp+2,BCDCTemp+1,BCDCTemp+0)
+
 	mov LEDRA, #00000100B
 	
+	;jnb preReflow, loadReflowState
 	mov a, SWB
-	jb acc.4, loadReflowState
+	jb acc.2, loadReflowState
 	ljmp preReflowState
 	
 loadReflowState:
-	clr preReflow
 	lcall LCD_init
+	lcall shortBeep
+	
+	mov a, #80H
+	lcall LCD_command
+	mov dptr, #reflowState_Str
+	lcall writeString
+	
 	mov a, #0
 	mov tempMin, a
 	mov tempSec, a
@@ -434,21 +506,30 @@ loadReflowState:
 	lcall convertToMinutes
 	mov secAlarm, tempSec
 	mov minAlarm, tempMin
-	mov hrsAlarm, #0
 	setb reflow
 reflowState:
-	mov a, #80H
-	lcall LCD_command
-	mov dptr, #reflowState_Str
-	lcall writeString
+	mov b, #0  ; Read channel 0
+	lcall Read_ADC_Channel
+	lcall calculateRoomTemp
+	
+	mov junctionTemp, x+0
+	asciiConvert(junctionTemp, BCDJTemp+2,BCDJTemp+1,BCDJTemp+0)
+	
+	lcall Opamp
+	lcall addingtemps
+	
+	mov currentTemp, x+0
+	asciiConvert(currentTemp, BCDCTemp+2,BCDCTemp+1,BCDCTemp+0)
+
 	
 	mov LEDRA, #00001000B
 	
-	mov a, SWB
-	jb acc.5, loadCoolingState
+	jnb reflow, loadCoolingState
 	ljmp reflowState
 	
 loadCoolingState:
+	lcall LCD_init
+	lcall shortBeep
 		
 coolingState:
 	mov a, #80H

@@ -73,9 +73,7 @@ initialLCD_Message: ;first start up message
 	mov a, #'s'
 	lcall LCD_put
 	 ;4 second delay
-	;lcall wait1s
-	;lcall wait1s
-	;lcall wait1s
+	lcall wait1s
 	lcall wait1s
 	ret
 

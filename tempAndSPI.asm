@@ -1,62 +1,6 @@
 $NOLIST
 
 CSEG
-
-Display:
-	mov dptr, #myLUT
-	; Display Digit 0
-    mov A, bcd+0
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX0, A
-	; Display Digit 1
-    mov A, bcd+0
-    swap a
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX1, A
-    ret
-    
-Display_2:
-	mov dptr, #myLUT
-	; Display Digit 0
-    mov A, bcd+0
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX5, A
-	; Display Digit 1
-    mov A, bcd+0
-    swap a
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX6, A
-    ; Display Digit 3
-    mov A, bcd+1
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX7, A  
-    ret
-    
-    
- Display_3:
-	mov dptr, #myLUT
-	; Display Digit 0
-    mov A, bcd+0
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX2, A
-	; Display Digit 1
-    mov A, bcd+0
-    swap a
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX3, A
-    ; Display Digit 3
-    mov A, bcd+1
-    anl a, #0fh
-    movc A, @A+dptr
-    mov HEX4, A
-    ret
     
 INIT_SPI:
     orl P0MOD, #00000110b ; Set SCLK, MOSI as outputs
@@ -201,7 +145,7 @@ calculateRoomTemp:
 	mov a, #'\n'
 	lcall putchar
 	ret
-		
+
 convert:
 ;mov dptr, #binarytovoltage
 	mov a, x+0 ;x+0 is the low input
@@ -245,8 +189,6 @@ opamp:
 	lcall div32
 
 	lcall hex2bcd_32
-	mov a, bcd
-	lcall Display_2
 	ret
 
 addingtemps:
@@ -257,9 +199,7 @@ addingtemps:
 	
 	lcall add32
 	
-	lcall hex2bcd_32
-	mov a, bcd
-	lcall Display_3
+	
 	ret
 	
 $LIST	
